@@ -147,14 +147,25 @@ void printOption() {
 //
 //}
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 int main() {
+	#ifdef _WIN32
+		SetConsoleOutputCP(65001);
+	#endif
 	tree = readCSVFile("worldcities-20210313-population-50000+.csv");
-//	cout << "☝️🤓├──\n\n\n";
-//	return 0;
 	if (tree == nullptr) {
 		cout << "Failed to build a tree\n";
 		return 0;
 	}
-	printKDTree(tree);
+//	printKDTree(tree);
+	saveKDTree("output.json", tree);
+	KDTree* t2 = loadKDTree("output.json");
+	saveKDTree("output2.json", t2);
+
+	deleteTree(tree);
+	deleteTree(t2);
 	return 0;
 }
