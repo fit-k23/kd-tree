@@ -11,8 +11,6 @@ using namespace std;
 
 KDTree *tree = nullptr; // main KD-Tree
 
-string readUserString();
-
 void progressLoading();
 
 void printOption();
@@ -20,12 +18,6 @@ void printOption();
 void handleUserInput(bool &);
 
 // COMMAND LINE FUNCTION
-string readUserString() {
-	string ret, tmp;
-	getline(cin, ret);
-	cin.ignore();
-	return ret;
-}
 
 void progressLoading() { // just for user interface
 	for (int i = 0; i < 3; ++i) {
@@ -43,7 +35,11 @@ void printOption() {
 	cout << "3) Insert multiple cities via specified CSV path.\n";
 	cout << "4) Nearest-neighbor search based on giving latitude and longitude.\n";
 	cout << "5) Query cities within a specified rectangular region\n";
-	cout << "6) Quit\n";
+	cout << "6) ========= Quit =========\n";
+	cout << "      ADVANCED FEATURES    \n";
+	cout << "7) Print current tree (if exist)\n";
+	cout << "8) Save tree to JSON file\n";
+	cout << "9) Load tree from JSON file\n";
 	cout << "Your option: ";
 }
 
@@ -64,17 +60,20 @@ void handleUserInput(bool &userLoop) {
 		string city;
 		double latitude, longitude;
 		cout << "City name: ";
-		city = readUserString();
+		cin.ignore();
+		getline(cin, city);
 		cout << "Latitude: ";
 		cin >> latitude;
 		cout << "Longitude: ";
 		cin >> longitude;
 		cout << "Insert (" << city << ", " << latitude << ", " << longitude << ") into KD-Tree\n";
+		insertDataBalance(tree, {city, latitude, longitude});
 	} else if (opt == 3) {
 		string csvPath;
 		cout << "Enter csv file path: ";
 
-		csvPath = readUserString();
+		cin.ignore();
+		getline(cin, csvPath);
 
 		ifstream fin(csvPath.c_str());
 		if (!fin.is_open()) {
@@ -97,7 +96,7 @@ void handleUserInput(bool &userLoop) {
 			} else {
 				progressLoading();
 				cout << "Complete loading csv file\n";
-				tree = readCSVFileIntoTree(csvPath);
+				insertBalanceFromCSV(tree, csvPath);
 			}
 		}
 		if (fin.is_open()) fin.close();
@@ -114,8 +113,7 @@ void handleUserInput(bool &userLoop) {
 			cout << "Tree is empty\n";
 		} else {
 			nearestNeighborSearch(tree, targ, 0, true, bestDist, bestCity);
-			cout << "Closet city to your location is (" << bestCity.city << ", " << bestCity.latitude << ", "
-				 << bestCity.longitude << ") with distance " << bestDist << '\n';
+			cout << "Closet city to your location is (" << bestCity.city << ", " << bestCity.latitude << ", " << bestCity.longitude << ") with distance " << bestDist << '\n';
 		}
 	} else if (opt == 5) {
 		double bottomLeftLat, bottomLeftLong;
@@ -135,6 +133,34 @@ void handleUserInput(bool &userLoop) {
 	} else if (opt == 6) {
 		cout << "Quitting...\n";
 		userLoop = false;
+	} else if (opt == 7) {
+		cout << "Tree visualize: " << (tree == nullptr ? "empty" : "") << "\n";
+		if (tree != nullptr) {
+			printKDTree(tree);
+		}
+	} else if (opt == 8) {
+		cout << "Output JSON file: ";
+		cin.ignore();
+		string filePath;
+		getline(cin, filePath);
+		if (!saveKDTree(filePath, tree)) {
+			cout << "Failed to save tree to file " << filePath << "\n";
+		} else {
+			cout << "Succeed to save tree to file " << filePath << "\n";
+		}
+	} else if (opt == 9) {
+		cout << "Input JSON file: ";
+		cin.ignore();
+		string filePath;
+		getline(cin, filePath);
+		KDTree *nTree = loadKDTree(filePath);
+		if (nTree == nullptr) {
+			cout << "Failed to load tree from file " << filePath << "\n";
+		} else {
+			deleteTree(tree);
+			tree = nTree;
+			cout << "Succeed to load tree from file " << filePath << "\n";
+		}
 	} else {
 		cout << "Invalid option\n";
 	}

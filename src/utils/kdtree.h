@@ -27,6 +27,7 @@ double getDist(Data, Data);
 void nearestNeighborSearch(KDTree *, const Data &, int, bool, double &, Data &);
 bool isInRange(const Data &, double, double, double, double);
 void rangeQuery(KDTree *, double, double, double, double, int);
+vector<Data> readCSVFile(const string &filePath);
 
 void printKDTree(KDTree *root = nullptr, const string &prefix = "", bool isLeft = false) {
 	if (root != nullptr) {
@@ -85,19 +86,28 @@ bool insertData(KDTree *&root, Data &data, int depth = 0) {
 	return insertData((data.longitude < root->data.longitude) ? root->left : root->right, data, depth + 1);
 }
 
-void NLR(KDTree *root, vector<Data> &dataset) {
+void NLR_Vectorify(KDTree *root, vector<Data> &dataset) {
 	if (root == nullptr) return;
 	dataset.push_back(root->data);
-	NLR(root->left, dataset);
-	NLR(root->right, dataset);
+	NLR_Vectorify(root->left, dataset);
+	NLR_Vectorify(root->right, dataset);
 }
 
 // Insert then rebuild
-void insertDataBalance(KDTree *&root, Data &data) {
+void insertDataBalance(KDTree *&root, Data data) {
 	vector<Data> dataset;
-	NLR(root, dataset);
+	NLR_Vectorify(root, dataset);
+//	cout << "Insert (" << data.city << ", " << data.latitude << ", " << data.longitude << ")\n";
 	dataset.push_back(data);
-	root = buildKDTree(dataset, 0, (long long) dataset.size());
+	deleteTree(root);
+	root = buildKDTree(dataset, 0, (long long) dataset.size() - 1);
+}
+
+void insertBalanceFromCSV(KDTree *& root, const string &filePath) {
+	vector<Data> dataset = readCSVFile(filePath);
+	NLR_Vectorify(root, dataset);
+	deleteTree(root);
+	root = buildKDTree(dataset, 0, (long long) dataset.size() - 1);
 }
 
 double getDist(Data x, Data y) {
@@ -151,30 +161,6 @@ void rangeQuery(KDTree *root, double leftLat, double leftLong, double rightLat, 
 	}
 }
 
-//KDTree* readCSVFile(const string& filePath) {
-//	ifstream file(filePath.c_str());
-//	if (!file.is_open()) {
-//		return nullptr;
-//	}
-//	KDTree *tree{nullptr};
-//	string tmp;
-//	getline(file, tmp); // skip header
-//	while (getline(file, tmp)) {
-//		Data data;
-//		size_t p1 = tmp.find(',');
-//		size_t p2 = tmp.find(',', p1 + 1);
-//		data.city = tmp.substr(0, p1);
-//		if (p2 <= p1) continue;
-//		data.latitude = stod(tmp.substr(p1 + 1, p2 - p1 - 1));
-//		p1 = tmp.find(',', p2 + 1);
-//		if (p1 <= p2) continue;
-//		data.longitude = stod(tmp.substr(p2 + 1, p1));
-//		insertData(tree, data);
-//	}
-//	file.close();
-//	return tree;
-//}
-
 vector<Data> readCSVFile(const string &filePath) {
 	ifstream file(filePath.c_str());
 	vector<Data> dataset;
@@ -200,6 +186,20 @@ vector<Data> readCSVFile(const string &filePath) {
 	return dataset;
 }
 
+bool writeCSVFromTree(KDTree *root, const string &filePath) {
+	ofstream file(filePath.c_str());
+	if (!file.is_open()) {
+		return false;
+	}
+	vector<Data> dataset;
+	NLR_Vectorify(root, dataset);
+	file << "city,lat,lng\n";
+	for (auto & data : dataset) {
+		file << data.city << "," << data.latitude << "," << data.longitude << "\n";
+	}
+	return true;
+}
+
 KDTree* readCSVFileIntoTree(const string &filePath) {
 	vector<Data> dataset = readCSVFile(filePath);
 	if (dataset.empty()) {
@@ -218,9 +218,9 @@ nlohmann::json tree_to_json(KDTree *root) {
 
 	nlohmann::json j;
 	j["data"] = nlohmann::json{
-			{"city",      root->data.city},
-			{"latitude",  root->data.latitude},
-			{"longitude", root->data.longitude}
+		{"city",      root->data.city},
+		{"latitude",  root->data.latitude},
+		{"longitude", root->data.longitude}
 	};
 	j["left"] = tree_to_json(root->left);
 	j["right"] = tree_to_json(root->right);
@@ -244,9 +244,9 @@ bool saveKDTree(const string &filePath, KDTree *root) {
 
 Data data_from_json(const nlohmann::json &j) {
 	return {
-			j.at("city").get<std::string>(),
-			j.at("latitude").get<double>(),
-			j.at("longitude").get<double>()
+		j.at("city").get<std::string>(),
+		j.at("latitude").get<double>(),
+		j.at("longitude").get<double>()
 	};
 }
 
