@@ -31,6 +31,7 @@ bool isInRange(const Data &, double, double, double, double);
 void rangeQuery(KDTree *, double, double, double, double, int);
 vector<Data> readCSVFile(const string &filePath);
 
+// Print KDTree in a human-friendly way. This function is used to visualize tree;
 void printKDTree(KDTree *root = nullptr, const string &prefix = "", bool isLeft = false) {
 	if (root != nullptr) {
 		cout << prefix;
@@ -63,20 +64,22 @@ struct DataCompare{
 	}
 };
 
+// Build a balanced KDTree using quick-sort alike method to sort out the dataset
 KDTree *buildKDTree(vector<Data> &dataset, long long l = 0, long long r = 1, int depth = 0) {
 	if (r >= dataset.size() || r < l) {
 		return nullptr;
 	}
-	sort(dataset.begin() + l, dataset.begin() + r + 1, DataCompare(depth % 2));
+	sort(dataset.begin() + l, dataset.begin() + r + 1, DataCompare(depth % 2)); //sort with input axis depth % 2
 	long long m = (l + r) / 2;
 
 	return new KDTree{
-		dataset[m],
+		dataset[m], // the median is the node at that location
 		buildKDTree(dataset, l, m - 1, depth + 1),
 		buildKDTree(dataset, m + 1, r, depth + 1)
 	};
 }
 
+// insert data without caring about balancing problem
 bool insertData(KDTree *&root, Data &data, int depth = 0) {
 	if (root == nullptr) {
 		root = new KDTree{data, nullptr, nullptr};
@@ -88,6 +91,7 @@ bool insertData(KDTree *&root, Data &data, int depth = 0) {
 	return insertData((data.longitude < root->data.longitude) ? root->left : root->right, data, depth + 1);
 }
 
+// post order traversal to get a list of all nodes in post order
 void NLR_Vectorify(KDTree *root, vector<Data> &dataset) {
 	if (root == nullptr) return;
 	dataset.push_back(root->data);
@@ -102,9 +106,11 @@ void insertDataBalance(KDTree *&root, Data data) {
 //	cout << "Insert (" << data.city << ", " << data.latitude << ", " << data.longitude << ")\n";
 	dataset.push_back(data);
 	deleteTree(root);
+	// rebuild the tree with new dataset
 	root = buildKDTree(dataset, 0, (long long) dataset.size() - 1);
 }
 
+// read csv, insert the new and rebuild the tree
 void insertBalanceFromCSV(KDTree *& root, const string &filePath) {
 	vector<Data> dataset = readCSVFile(filePath);
 	NLR_Vectorify(root, dataset);
@@ -112,6 +118,7 @@ void insertBalanceFromCSV(KDTree *& root, const string &filePath) {
 	root = buildKDTree(dataset, 0, (long long) dataset.size() - 1);
 }
 
+// get distance
 double getDist(Data x, Data y) {
 	// compute latitude and longitude distance
 	double distLat = (y.latitude - x.latitude) * M_PI / 180.0;
@@ -139,7 +146,7 @@ void nearestNeighborSearch(KDTree *root, const Data &targ, int depth, bool noCan
 	}
 	if (bestDist == 0) return;
 
-	double distDim = (depth % 2 == 0 ? root->data.latitude - targ.latitude : root->data.longitude - targ.longitude);
+	double distDim = (depth % 2 == 0 ? root->data.latitude - targ.latitude : root->data.longitude - targ.longitude); // find distance in that dimension
 	(depth += 1) %= 2;
 	nearestNeighborSearch(distDim > 0 ? root->left : root->right, targ, depth, noCandidate, bestDist, bestData);
 	if ((long double) distDim * (long double) distDim >= bestDist) return;
@@ -150,6 +157,7 @@ bool isInRange(const Data &city, double leftLat, double leftLong, double rightLa
 	return city.latitude >= leftLat && city.latitude <= rightLat && city.longitude >= leftLong && city.longitude <= rightLong;
 }
 
+// post order with dimension, used to query out those nodes inside the box
 void rangeQuery(KDTree *root, vector <Data> &result, double leftLat, double leftLong, double rightLat, double rightLong, int depth) {
 	if (root == nullptr) return;
 	if (isInRange(root->data, leftLat, leftLong, rightLat, rightLong)) {
@@ -218,6 +226,7 @@ KDTree* readCSVFileIntoTree(const string &filePath) {
 #include "json.hpp"
 // Convert KD Tree to json file
 
+// convert tree to json structure
 nlohmann::json tree_to_json(KDTree *root) {
 	if (root == nullptr) {
 		return nullptr;
@@ -235,6 +244,7 @@ nlohmann::json tree_to_json(KDTree *root) {
 	return j;
 }
 
+// open file, convert tree to json structure then save the structure to the file
 bool saveKDTree(const string &filePath, KDTree *root) {
 	ofstream file(filePath.c_str());
 	if (!file.is_open()) {
@@ -249,6 +259,7 @@ bool saveKDTree(const string &filePath, KDTree *root) {
 	return true;
 }
 
+// convert json's data to node's data
 Data data_from_json(const nlohmann::json &j) {
 	return {
 		j.at("city").get<std::string>(),
@@ -257,6 +268,7 @@ Data data_from_json(const nlohmann::json &j) {
 	};
 }
 
+// convert json's class property to node's property
 KDTree *tree_from_json(const nlohmann::json &j) {
 	if (j.is_null()) {
 		return nullptr;
@@ -277,6 +289,7 @@ KDTree *tree_from_json(const nlohmann::json &j) {
 	return root;
 }
 
+// load kdtree from json file
 KDTree *loadKDTree(const string &filePath) {
 	ifstream file(filePath.c_str());
 	if (!file.is_open()) {
