@@ -30,16 +30,17 @@ void progressLoading() { // just for user interface
 void printOption() {
 	cout << "-----------------------------------------------------\n";
 	cout << "Here are your options:\n";
-	cout << "1) Load the list of cities from a CSV file database.\n";
-	cout << "2) Insert a new city into KD-Tree.\n";
-	cout << "3) Insert multiple cities via specified CSV path.\n";
-	cout << "4) Nearest-neighbor search based on giving latitude and longitude.\n";
-	cout << "5) Query cities within a specified rectangular region\n";
-	cout << "6) ========= Quit =========\n";
-	cout << "      ADVANCED FEATURES    \n";
-	cout << "7) Print current tree (if exist)\n";
-	cout << "8) Save tree to JSON file\n";
-	cout << "9) Load tree from JSON file\n";
+	cout << " 1) Load the list of cities from a CSV file database.\n";
+	cout << " 2) Insert a new city into KD-Tree.\n";
+	cout << " 3) Insert multiple cities via specified CSV path.\n";
+	cout << " 4) Nearest-neighbor search based on giving latitude and longitude.\n";
+	cout << " 5) Query cities within a specified rectangular region\n";
+	cout << " 6) ========= Quit =========\n";
+	cout << "       ADVANCED FEATURES    \n";
+	cout << " 7) Print current tree (if exist)\n";
+	cout << " 8) Save tree to JSON file\n";
+	cout << " 9) Load tree from JSON file\n";
+	cout << "10) Save tree to CSV file\n";
 	cout << "Your option: ";
 }
 
@@ -101,35 +102,49 @@ void handleUserInput(bool &userLoop) {
 		}
 		if (fin.is_open()) fin.close();
 	} else if (opt == 4) {
-		double latitude, longitude;
-		cout << "Latitude: ";
-		cin >> latitude;
-		cout << "Longitude: ";
-		cin >> longitude;
-		double bestDist = 0;
-		Data bestCity, targ = {"", latitude, longitude};
-
 		if (tree == nullptr) {
 			cout << "Tree is empty\n";
 		} else {
+			double latitude, longitude;
+			cout << "Latitude: ";
+			cin >> latitude;
+			cout << "Longitude: ";
+			cin >> longitude;
+			double bestDist = 0;
+			Data bestCity, targ = {"", latitude, longitude};
+
 			nearestNeighborSearch(tree, targ, 0, true, bestDist, bestCity);
 			cout << "Closet city to your location is (" << bestCity.city << ", " << bestCity.latitude << ", " << bestCity.longitude << ") with distance " << bestDist << '\n';
 		}
 	} else if (opt == 5) {
-		double bottomLeftLat, bottomLeftLong;
-		double topRightLat, topRightLong;
-		cout << "Bottom-left latitude: ";
-		cin >> bottomLeftLat;
-		cout << "Bottom-left longitude: ";
-		cin >> bottomLeftLong;
-		cout << "Top-right latitude: ";
-		cin >> topRightLat;
-		cout << "Top-right longitude: ";
-		cin >> topRightLong;
-
 		if (tree == nullptr) {
 			cout << "Tree is empty\n";
-		} else rangeQuery(tree, bottomLeftLat, bottomLeftLong, topRightLat, topRightLong, 0);
+		} else {
+			double bottomLeftLat, bottomLeftLong;
+			double topRightLat, topRightLong;
+			cout << "Bottom-left latitude: ";
+			cin >> bottomLeftLat;
+			cout << "Bottom-left longitude: ";
+			cin >> bottomLeftLong;
+			cout << "Top-right latitude: ";
+			cin >> topRightLat;
+			cout << "Top-right longitude: ";
+			cin >> topRightLong;
+			cout << "Output csv [Enter to skip]: ";
+			cin.ignore();
+			string outputFile;
+			getline(cin, outputFile);
+
+			vector<Data> queries = {};
+			rangeQuery(tree, queries, bottomLeftLat, bottomLeftLong, topRightLat, topRightLong, 0);
+			for (auto &query : queries) {
+				cout << "City (" << query.city << ", " << query.latitude << ", " << query.longitude << ") is in range\n";
+			}
+			if (!outputFile.empty()) {
+				cout << "Saved output to file (" << outputFile << ")\n";
+				writeCSVFile(queries, outputFile);
+			}
+		}
 	} else if (opt == 6) {
 		cout << "Quitting...\n";
 		userLoop = false;
@@ -160,6 +175,16 @@ void handleUserInput(bool &userLoop) {
 			deleteTree(tree);
 			tree = nTree;
 			cout << "Succeed to load tree from file " << filePath << "\n";
+		}
+	} else if (opt == 10) {
+		if (tree == nullptr) {
+			cout << "Tree is empty\n";
+		} else {
+			cout << "Output CSV file: ";
+			cin.ignore();
+			string filePath;
+			getline(cin, filePath);
+			writeCSVFromTree(tree, filePath);
 		}
 	} else {
 		cout << "Invalid option\n";

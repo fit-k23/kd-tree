@@ -1,3 +1,4 @@
+#pragma clang diagnostic push
 #ifndef KD_TREE_KDTREE_H
 #define KD_TREE_KDTREE_H
 
@@ -149,16 +150,16 @@ bool isInRange(const Data &city, double leftLat, double leftLong, double rightLa
 	return city.latitude >= leftLat && city.latitude <= rightLat && city.longitude >= leftLong && city.longitude <= rightLong;
 }
 
-void rangeQuery(KDTree *root, double leftLat, double leftLong, double rightLat, double rightLong, int depth) {
+void rangeQuery(KDTree *root, vector <Data> &result, double leftLat, double leftLong, double rightLat, double rightLong, int depth) {
 	if (root == nullptr) return;
 	if (isInRange(root->data, leftLat, leftLong, rightLat, rightLong)) {
-		cout << "City (" << root->data.city << ", " << root->data.latitude << ", " << root->data.longitude << ") is in range\n";
+		result.push_back({root->data.city, root->data.latitude, root->data.longitude});
 	}
 	if ((depth % 2 == 0 && root->data.latitude > leftLat) || (depth % 2 == 1 && root->data.longitude > leftLong)) {
-		rangeQuery(root->left, leftLat, leftLong, rightLat, rightLong, depth + 1);
+		rangeQuery(root->left, result, leftLat, leftLong, rightLat, rightLong, depth + 1);
 	}
 	if ((depth % 2 == 0 && root->data.latitude < rightLat) || (depth % 2 == 1 && root->data.longitude < rightLong)) {
-		rangeQuery(root->right, leftLat, leftLong, rightLat, rightLong, depth + 1);
+		rangeQuery(root->right, result, leftLat, leftLong, rightLat, rightLong, depth + 1);
 	}
 }
 
@@ -187,18 +188,23 @@ vector<Data> readCSVFile(const string &filePath) {
 	return dataset;
 }
 
-bool writeCSVFromTree(KDTree *root, const string &filePath) {
+bool writeCSVFile(const vector<Data> &dataset, const string &filePath) {
 	ofstream file(filePath.c_str());
 	if (!file.is_open()) {
 		return false;
 	}
-	vector<Data> dataset;
-	NLR_Vectorify(root, dataset);
 	file << "city,lat,lng\n";
-	for (auto & data : dataset) {
+	for (auto &data : dataset) {
 		file << data.city << "," << data.latitude << "," << data.longitude << "\n";
 	}
+	file.close();
 	return true;
+}
+
+bool writeCSVFromTree(KDTree *root, const string &filePath) {
+	vector<Data> dataset;
+	NLR_Vectorify(root, dataset);
+	return writeCSVFile(dataset, filePath);
 }
 
 KDTree* readCSVFileIntoTree(const string &filePath) {
@@ -283,3 +289,5 @@ KDTree *loadKDTree(const string &filePath) {
 
 #pragma clang diagnostic pop
 #endif //KD_TREE_KDTREE_H
+
+#pragma clang diagnostic pop
