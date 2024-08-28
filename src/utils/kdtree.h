@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
+#include <cmath>
 
 using namespace std;
 
@@ -22,14 +23,19 @@ struct KDTree{ // NOLINT(*-pro-type-member-init)
 	KDTree *left, *right;
 };
 
-void printKDTree(KDTree *root = nullptr, const string& prefix = "", bool isLeft = false) {
+double getDist(Data, Data);
+void nearestNeighborSearch(KDTree *, const Data &, int, bool, double &, Data &);
+bool isInRange(const Data &, double, double, double, double);
+void rangeQuery(KDTree *, double, double, double, double, int);
+
+void printKDTree(KDTree *root = nullptr, const string &prefix = "", bool isLeft = false) {
 	if (root != nullptr) {
 		cout << prefix;
 		cout << (isLeft ? "├──" : "└──");
 
 		// print the value of the node
 		cout.precision(4);
-		cout << root->data.city << " - (" << fixed << root->data.latitude << "; " << root->data.longitude <<") " << "\n";
+		cout << root->data.city << " - (" << fixed << root->data.latitude << "; " << root->data.longitude << ")\n";
 
 		// enter the next tree level - left and right branch
 		printKDTree(root->left, prefix + (isLeft ? "│   " : "    "), true);
@@ -37,43 +43,35 @@ void printKDTree(KDTree *root = nullptr, const string& prefix = "", bool isLeft 
 	}
 }
 
-void deleteTree(KDTree *root) {
+void deleteTree(KDTree *&root) {
 	if (root == nullptr) return;
 	deleteTree(root->left);
 	deleteTree(root->right);
 	delete root;
+	root = nullptr;
 }
 
 struct DataCompare{
 	int axis;
+
 	DataCompare(int axis) : axis(axis) {} // NOLINT(*-explicit-constructor)
 	bool operator()(const Data &d1, const Data &d2) const {
 		return (axis == 0 ? d1.latitude < d2.latitude : d1.longitude < d2.longitude);
 	}
 };
 
-KDTree* buildKDTree(vector<Data> &dataset, long long l = 0, long long r = 1, int depth = 0) {
+KDTree *buildKDTree(vector<Data> &dataset, long long l = 0, long long r = 1, int depth = 0) {
 	if (r >= dataset.size() || r < l) {
 		return nullptr;
 	}
-
+	sort(dataset.begin() + l, dataset.begin() + r + 1, DataCompare(depth % 2));
 	long long m = (l + r) / 2;
 
-	if (l > m || r < m) {
-		return nullptr;
-	}
-
-	sort(dataset.begin() + l, dataset.begin() + r, DataCompare(depth % 2));
-
-	KDTree *left = buildKDTree(dataset, l, m - 1, depth + 1);
-	KDTree *right = buildKDTree(dataset, m + 1, r, depth + 1);
-
-	auto *root = new KDTree{
+	return new KDTree{
 		dataset[m],
-		left,
-		right
+		buildKDTree(dataset, l, m - 1, depth + 1),
+		buildKDTree(dataset, m + 1, r, depth + 1)
 	};
-	return root;
 }
 
 bool insertData(KDTree *&root, Data &data, int depth = 0) {
@@ -99,12 +97,59 @@ void insertDataBalance(KDTree *&root, Data &data) {
 	vector<Data> dataset;
 	NLR(root, dataset);
 	dataset.push_back(data);
-	root = buildKDTree(dataset, 0, dataset.size());
+	root = buildKDTree(dataset, 0, (long long) dataset.size());
 }
 
-void nearestNeighborSearch(double latitude, double longitude);
+double getDist(Data x, Data y) {
+	// compute latitude and longitude distance
+	double distLat = (y.latitude - x.latitude) * M_PI / 180.0;
+	double distLong = (y.longitude - x.longitude) * M_PI / 180.0;
 
-void rangeQuery(double leftLat, double leftLong, double rightLat, double rightLong);
+	// convert to radians
+	x.latitude = (x.latitude * M_PI) / 180.0;
+	y.latitude = (y.latitude * M_PI) / 180.0;
+
+	// formula
+	double a = pow(sin(distLat / 2), 2) + pow(sin(distLong / 2), 2) * cos(x.latitude) * cos(y.latitude);
+	double rad = 6371;
+	double c = 2 * asin(sqrt(a));
+	return rad * c;
+}
+
+void nearestNeighborSearch(KDTree *root, const Data &targ, int depth, bool noCandidate, double &bestDist, Data &bestData) {
+	if (root == nullptr) return;
+
+	double dist = getDist(root->data, targ);
+	if (noCandidate || dist < bestDist) {
+		bestDist = dist;
+		bestData = root->data;
+		noCandidate = false;
+	}
+	if (bestDist == 0) return;
+
+	double distDim = (depth % 2 == 0 ? root->data.latitude - targ.latitude : root->data.longitude - targ.longitude);
+	(depth += 1) %= 2;
+	nearestNeighborSearch(distDim > 0 ? root->left : root->right, targ, depth, noCandidate, bestDist, bestData);
+	if ((long double) distDim * (long double) distDim >= bestDist) return;
+	nearestNeighborSearch(distDim > 0 ? root->right : root->left, targ, depth, noCandidate, bestDist, bestData);
+}
+
+bool isInRange(const Data &city, double leftLat, double leftLong, double rightLat, double rightLong) {
+	return city.latitude >= leftLat && city.latitude <= rightLat && city.longitude >= leftLong && city.longitude <= rightLong;
+}
+
+void rangeQuery(KDTree *root, double leftLat, double leftLong, double rightLat, double rightLong, int depth) {
+	if (root == nullptr) return;
+	if (isInRange(root->data, leftLat, leftLong, rightLat, rightLong)) {
+		cout << "City (" << root->data.city << ", " << root->data.latitude << ", " << root->data.longitude << ") is in range\n";
+	}
+	if ((depth % 2 == 0 && root->data.latitude > leftLat) || (depth % 2 == 1 && root->data.longitude > leftLong)) {
+		rangeQuery(root->left, leftLat, leftLong, rightLat, rightLong, depth + 1);
+	}
+	if ((depth % 2 == 0 && root->data.latitude < rightLat) || (depth % 2 == 1 && root->data.longitude < rightLong)) {
+		rangeQuery(root->right, leftLat, leftLong, rightLat, rightLong, depth + 1);
+	}
+}
 
 //KDTree* readCSVFile(const string& filePath) {
 //	ifstream file(filePath.c_str());
@@ -130,7 +175,7 @@ void rangeQuery(double leftLat, double leftLong, double rightLat, double rightLo
 //	return tree;
 //}
 
-vector<Data> readCSVFile(const string& filePath) {
+vector<Data> readCSVFile(const string &filePath) {
 	ifstream file(filePath.c_str());
 	vector<Data> dataset;
 	if (!file.is_open()) {
@@ -155,8 +200,15 @@ vector<Data> readCSVFile(const string& filePath) {
 	return dataset;
 }
 
-#include "json.hpp"
+KDTree* readCSVFileIntoTree(const string &filePath) {
+	vector<Data> dataset = readCSVFile(filePath);
+	if (dataset.empty()) {
+		return nullptr;
+	}
+	return buildKDTree(dataset, 0, dataset.size() - 1);
+}
 
+#include "json.hpp"
 // Convert KD Tree to json file
 
 nlohmann::json tree_to_json(KDTree *root) {
@@ -166,9 +218,9 @@ nlohmann::json tree_to_json(KDTree *root) {
 
 	nlohmann::json j;
 	j["data"] = nlohmann::json{
-		{"city", root->data.city},
-		{"latitude", root->data.latitude},
-		{"longitude", root->data.longitude}
+			{"city",      root->data.city},
+			{"latitude",  root->data.latitude},
+			{"longitude", root->data.longitude}
 	};
 	j["left"] = tree_to_json(root->left);
 	j["right"] = tree_to_json(root->right);
@@ -192,13 +244,13 @@ bool saveKDTree(const string &filePath, KDTree *root) {
 
 Data data_from_json(const nlohmann::json &j) {
 	return {
-	j.at("city").get<std::string>(),
-	j.at("latitude").get<double>(),
-	j.at("longitude").get<double>()
+			j.at("city").get<std::string>(),
+			j.at("latitude").get<double>(),
+			j.at("longitude").get<double>()
 	};
 }
 
-KDTree* tree_from_json(const nlohmann::json& j) {
+KDTree *tree_from_json(const nlohmann::json &j) {
 	if (j.is_null()) {
 		return nullptr;
 	}
@@ -218,12 +270,12 @@ KDTree* tree_from_json(const nlohmann::json& j) {
 	return root;
 }
 
-KDTree* loadKDTree(const string &filePath) {
+KDTree *loadKDTree(const string &filePath) {
 	ifstream file(filePath.c_str());
 	if (!file.is_open()) {
 		return nullptr;
 	}
-	KDTree* root = tree_from_json(nlohmann::json::parse(file));
+	KDTree *root = tree_from_json(nlohmann::json::parse(file));
 	file.close();
 	return root;
 }
