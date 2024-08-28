@@ -6,18 +6,26 @@
 
 #include <fstream>
 #include <string>
+#include <sstream>
 
 using namespace std;
 
-struct Data{
+struct Data{ // NOLINT(*-pro-type-member-init)
 	std::string city;
 	double latitude, longitude;
 };
 
-struct KDTree{
+struct KDTree{ // NOLINT(*-pro-type-member-init)
 	Data data;
 	KDTree *left, *right;
 };
+
+void deleteTree(KDTree *root) {
+	if (root == nullptr) return;
+	deleteTree(root->left);
+	deleteTree(root->right);
+	deleteTree(root);
+}
 
 bool insertData(KDTree *&root, Data &data, int depth = 0) {
 	if (root == nullptr) {
@@ -51,28 +59,98 @@ KDTree* readCSVFile(const string& filePath) {
 		data.city = tmp.substr(0, p1);
 		if (p2 <= p1) continue;
 		data.latitude = stod(tmp.substr(p1 + 1, p2 - p1 - 1));
-		p1 = tmp.find(' ', p2 + 1);
+		p1 = tmp.find(',', p2 + 1);
 		if (p1 <= p2) continue;
-		data.longitude = stod(tmp.substr(p2 + 1, p1 - p2 - 1));
+		data.longitude = stod(tmp.substr(p2 + 1, p1));
 		insertData(tree, data);
 	}
 	file.close();
 	return tree;
 }
 
-void printKDTree(KDTree *root = nullptr, string prefix = "", bool isLeft = false) {
+void printKDTree(KDTree *root = nullptr, const string& prefix = "", bool isLeft = false) {
 	if (root != nullptr) {
 		cout << prefix;
 		cout << (isLeft ? "├──" : "└──");
-//		cout << (isLeft ? "─" : "|");
 
 		// print the value of the node
-		cout << " " << root->data.city << " - (" << root->data.latitude << "; " << root->data.longitude <<")\n";
+		cout.precision(4);
+		cout << root->data.city << " - (" << fixed << root->data.latitude << "; " << root->data.longitude <<")\n";
 
 		// enter the next tree level - left and right branch
 		printKDTree(root->left, prefix + (isLeft ? "│   " : "    "), true);
 		printKDTree(root->right, prefix + (isLeft ? "│   " : "    "), false);
 	}
+}
+
+#include "json.hpp"
+
+// Convert KD Tree to json file
+
+nlohmann::json tree_to_json(KDTree *root) {
+	if (root == nullptr) {
+		return nullptr;
+	}
+
+	nlohmann::json j;
+	j["data"] = nlohmann::json{
+		{"city", root->data.city},
+		{"latitude", root->data.latitude},
+		{"longitude", root->data.longitude}
+	};
+	j["left"] = tree_to_json(root->left);
+	j["right"] = tree_to_json(root->right);
+
+	return j;
+}
+
+bool saveKDTree(const string &filePath, KDTree *root) {
+	ofstream file(filePath.c_str());
+	if (!file.is_open()) {
+		return false;
+	}
+	nlohmann::json j = tree_to_json(root);
+	if (j == nullptr) {
+		return false;
+	}
+	file << j.dump(1, '\t');
+	file.close();
+	return true;
+}
+
+Data data_from_json(const nlohmann::json &j) {
+	return {
+	j.at("city").get<std::string>(),
+	j.at("latitude").get<double>(),
+	j.at("longitude").get<double>()
+	};
+}
+
+KDTree* tree_from_json(const nlohmann::json& j) {
+	if (j.is_null()) {
+		return nullptr;
+	}
+
+	auto *root = new KDTree;
+
+	if (j.contains("data")) {
+		root->data = data_from_json(j.at("data"));
+	}
+
+	if (j.contains("left")) {
+		root->left = tree_from_json(j.at("left"));
+	}
+	if (j.contains("right")) {
+		root->right = tree_from_json(j.at("right"));
+	}
+	return root;
+}
+
+KDTree* loadKDTree(const string &filePath) {
+	ifstream file(filePath.c_str());
+	KDTree* root = tree_from_json(nlohmann::json::parse(file));
+	file.close();
+	return root;
 }
 
 #pragma clang diagnostic pop
