@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
+#define _USE_MATH_DEFINES
 #include <cmath>
 
 using namespace std;

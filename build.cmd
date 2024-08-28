@@ -16,8 +16,6 @@ set CFLAGS="-std=c++11"
 set BUILD_FLAGS="-O2"
 @REM set BUILD_FLAGS=""
 
-del /f /q /a src\sort.h
-
 %GPP_BIN% %CFLAGS% %BUILD_FLAGS% -o main.exe src/main.cpp
 
 if %ERRORLEVEL%==0 (
