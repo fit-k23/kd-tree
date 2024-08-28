@@ -16,7 +16,7 @@ set CFLAGS="-std=c++11"
 set BUILD_FLAGS="-O2"
 @REM set BUILD_FLAGS=""
 
-%GPP_BIN% %CFLAGS% %BUILD_FLAGS% -o main.exe src/main.cpp
+%GPP_BIN% %CFLAGS% %BUILD_FLAGS% -o kdtree.exe src/main.cpp
 
 if %ERRORLEVEL%==0 (
     echo:

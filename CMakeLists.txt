@@ -3,7 +3,7 @@ project(kd-tree)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_EXE_LINKER_FLAGS "-static")
-set(OUTPUT_EXECUTABLE_NAME "main")
+set(OUTPUT_EXECUTABLE_NAME "kdtree")
 
 include(FetchContent)
 
