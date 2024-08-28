@@ -24,7 +24,7 @@ void deleteTree(KDTree *root) {
 	if (root == nullptr) return;
 	deleteTree(root->left);
 	deleteTree(root->right);
-	deleteTree(root);
+	delete root;
 }
 
 bool insertData(KDTree *&root, Data &data, int depth = 0) {
