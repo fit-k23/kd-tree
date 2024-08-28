@@ -1,14 +1,16 @@
 #ifndef KD_TREE_KDTREE_H
 #define KD_TREE_KDTREE_H
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "misc-no-recursion"
-
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <algorithm>
+#include <vector>
 
 using namespace std;
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-no-recursion"
 
 struct Data{ // NOLINT(*-pro-type-member-init)
 	std::string city;
@@ -20,15 +22,27 @@ struct KDTree{ // NOLINT(*-pro-type-member-init)
 	KDTree *left, *right;
 };
 
+void printKDTree(KDTree *root = nullptr, const string& prefix = "", bool isLeft = false) {
+	if (root != nullptr) {
+		cout << prefix;
+		cout << (isLeft ? "├──" : "└──");
+
+		// print the value of the node
+		cout.precision(4);
+		cout << root->data.city << " - (" << fixed << root->data.latitude << "; " << root->data.longitude <<") " << "\n";
+
+		// enter the next tree level - left and right branch
+		printKDTree(root->left, prefix + (isLeft ? "│   " : "    "), true);
+		printKDTree(root->right, prefix + (isLeft ? "│   " : "    "), false);
+	}
+}
+
 void deleteTree(KDTree *root) {
 	if (root == nullptr) return;
 	deleteTree(root->left);
 	deleteTree(root->right);
 	delete root;
 }
-
-#include <vector>
-
 
 struct DataCompare{
 	int axis;
@@ -38,18 +52,28 @@ struct DataCompare{
 	}
 };
 
-KDTree* buildKDTree(vector<Data> &dataset, unsigned long long l = 0, unsigned long long r = 0, int depth = 0) {
-	if (r >= dataset.size() || r <= l || dataset.empty()) {
+KDTree* buildKDTree(vector<Data> &dataset, long long l = 0, long long r = 1, int depth = 0) {
+	if (r >= dataset.size() || r < l) {
 		return nullptr;
 	}
-	size_t m = (l + r) / 2;
 
-	sort(dataset.begin() + l, dataset.begin() + r, DataCompare(depth % 2)); // NOLINT(*-narrowing-conversions)
-	return new KDTree{
+	long long m = (l + r) / 2;
+
+	if (l > m || r < m) {
+		return nullptr;
+	}
+
+	sort(dataset.begin() + l, dataset.begin() + r, DataCompare(depth % 2));
+
+	KDTree *left = buildKDTree(dataset, l, m - 1, depth + 1);
+	KDTree *right = buildKDTree(dataset, m + 1, r, depth + 1);
+
+	auto *root = new KDTree{
 		dataset[m],
-		buildKDTree(dataset, 0, m, depth + 1),
-		buildKDTree(dataset, m + 1, r, depth + 1)
+		left,
+		right
 	};
+	return root;
 }
 
 bool insertData(KDTree *&root, Data &data, int depth = 0) {
@@ -110,6 +134,7 @@ vector<Data> readCSVFile(const string& filePath) {
 	ifstream file(filePath.c_str());
 	vector<Data> dataset;
 	if (!file.is_open()) {
+		cout << "Failed to read files\n";
 		return dataset;
 	}
 	string tmp;
@@ -128,21 +153,6 @@ vector<Data> readCSVFile(const string& filePath) {
 	}
 	file.close();
 	return dataset;
-}
-
-void printKDTree(KDTree *root = nullptr, const string& prefix = "", bool isLeft = false) {
-	if (root != nullptr) {
-		cout << prefix;
-		cout << (isLeft ? "├──" : "└──");
-
-		// print the value of the node
-		cout.precision(4);
-		cout << root->data.city << " - (" << fixed << root->data.latitude << "; " << root->data.longitude <<")\n";
-
-		// enter the next tree level - left and right branch
-		printKDTree(root->left, prefix + (isLeft ? "│   " : "    "), true);
-		printKDTree(root->right, prefix + (isLeft ? "│   " : "    "), false);
-	}
 }
 
 #include "json.hpp"
@@ -210,6 +220,9 @@ KDTree* tree_from_json(const nlohmann::json& j) {
 
 KDTree* loadKDTree(const string &filePath) {
 	ifstream file(filePath.c_str());
+	if (!file.is_open()) {
+		return nullptr;
+	}
 	KDTree* root = tree_from_json(nlohmann::json::parse(file));
 	file.close();
 	return root;

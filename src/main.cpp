@@ -1,13 +1,8 @@
 #include <iostream>
-#include <algorithm>
-#include <fstream>
-#include <string>
-
+#include <vector>
 #include "utils/kdtree.h"
 
 using namespace std;
-
-KDTree *tree = nullptr;
 
 //double SimpleMap_loaded = false;
 //
@@ -151,21 +146,34 @@ void printOption() {
 #include <windows.h>
 #endif
 
+KDTree *tree = nullptr;
+
 int main() {
 	#ifdef _WIN32
 		SetConsoleOutputCP(65001);
 	#endif
-	tree = readCSVFile("worldcities-20210313-population-50000+.csv");
-	if (tree == nullptr) {
+	vector<Data> dataset = readCSVFile("worldcities-20210313-population-50000+.csv");
+//	vector<Data> dataset = readCSVFile("test.csv");
+
+	if (dataset.empty()) {
 		cout << "Failed to build a tree\n";
 		return 0;
 	}
-//	printKDTree(tree);
-	saveKDTree("output.json", tree);
-	KDTree* t2 = loadKDTree("output.json");
-	saveKDTree("output2.json", t2);
+
+	cout << dataset[0].city << "\n";
+
+	tree = buildKDTree(dataset, 0, dataset.size() - 1);
+	if (tree == nullptr) {
+		cout << "Tree is null\n";
+	}
+	cout << "Tree: \n";
+
+	printKDTree(tree);
+//	saveKDTree("output.json", tree);
+//	KDTree* t2 = loadKDTree("output.json");
+//	saveKDTree("output2.json", t2);
 
 	deleteTree(tree);
-	deleteTree(t2);
+//	deleteTree(t2);
 	return 0;
 }
